@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Predictor AI</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #f4f4f5; padding: 2rem; display: flex; justify-content: center; }
+        .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
+        .input-group { margin-bottom: 1rem; }
+        label { display: block; font-weight: bold; margin-bottom: 0.5rem; font-size: 0.9rem; }
+        input { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 0.75rem; background: #2563eb; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 1rem; }
+        button:hover { background: #1d4ed8; }
+        #result { margin-top: 1.5rem; padding: 1rem; text-align: center; font-size: 1.25rem; font-weight: bold; border-radius: 4px; display: none; }
+        .rain { background: #dbeafe; color: #1e3a8a; border: 1px solid #bfdbfe; }
+        .norain { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Weather Predictor AI</h2>
+    <p style="color: #666; margin-bottom: 1.5rem;">Enter current weather conditions to run the Random Forest model.</p>
+    
+    <form id="predictForm">
+        <!-- 14 inputs generated dynamically via JS -->
+        <div id="inputs-container"></div>
+        <button type="submit">Run Prediction</button>
+    </form>
+
+    <div id="result"></div>
+</div>
+
+<script>
+    // 1. Define the 14 features (Precipitation has been dropped to prevent target leakage)
+    const featureNames = [
+        "Temperature", "Humidity", "Wind_Speed", "Pressure", 
+        "Cloud_Cover", "Dew_Point", "Visibility", 
+        "Solar_Radiation", "UV_Index", "Wind_Direction", "Gust_Speed", 
+        "Soil_Temperature", "Soil_Moisture", "Air_Quality"
+    ];
+
+    // 2. Dynamically build the UI
+    const container = document.getElementById('inputs-container');
+    featureNames.forEach((name, index) => {
+        const featureId = `feature_${index + 1}`;
+        container.innerHTML += `
+            <div class="input-group">
+                <label>${name.replace(/_/g, ' ')}</label>
+                <input type="number" step="any" id="${featureId}" value="0" required>
+            </div>
+        `;
+    });
+
+    // 3. Handle the form submission securely
+    document.getElementById('predictForm').addEventListener('submit', async (e) => {
+        e.preventDefault(); 
+        
+        // Package inputs into a pure ARRAY of exactly 14 elements
+        const featureValues = [];
+        for (let i = 1; i <= 14; i++) {
+            let val = parseFloat(document.getElementById(`feature_${i}`).value);
+            featureValues.push(val);
+        }
+
+        const resultDiv = document.getElementById('result');
+        resultDiv.style.display = 'block';
+        resultDiv.className = '';
+        resultDiv.innerText = "Connecting to AI...";
+
+        try {
+            // Send data matching the exact Pydantic schema: {"features": [0,0,0...]}
+            const response = await fetch('http://127.0.0.1:8001/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ features: featureValues }) 
+            });
+
+            if (!response.ok) {
+                throw new Error(`API rejected the data. Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            // Render the prediction
+            resultDiv.innerText = `Prediction: ${data.prediction}`;
+            resultDiv.className = data.prediction === "Rain" ? "rain" : "norain";
+            
+        } catch (error) {
+            console.error("Network or server failure:", error);
+            resultDiv.innerText = "Error: Cannot connect to the server. Check console for details.";
+            resultDiv.style.background = "#fee2e2";
+            resultDiv.style.color = "#991b1b";
+        }
+    });
+</script>
+</body>
+</html>
