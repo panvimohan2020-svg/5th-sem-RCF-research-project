@@ -4,3 +4,7 @@ data/raw/
 .ipynb_checkpoints/
 venv/
 pycache/
+
+notebooks/*.pkl
+
+notebooks/*.pkl

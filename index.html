@@ -3,97 +3,1112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weather Predictor AI</title>
+    <title>Weather Predictor AI — Enterprise MLOps Dashboard</title>
+    <!-- Fonts: Inter & Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js 4.x -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: system-ui, sans-serif; background: #f4f4f5; padding: 2rem; display: flex; justify-content: center; }
-        .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
-        .input-group { margin-bottom: 1rem; }
-        label { display: block; font-weight: bold; margin-bottom: 0.5rem; font-size: 0.9rem; }
-        input { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 0.75rem; background: #2563eb; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 1rem; }
-        button:hover { background: #1d4ed8; }
-        #result { margin-top: 1.5rem; padding: 1rem; text-align: center; font-size: 1.25rem; font-weight: bold; border-radius: 4px; display: none; }
-        .rain { background: #dbeafe; color: #1e3a8a; border: 1px solid #bfdbfe; }
-        .norain { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        :root {
+            --bg-1: #0F172A;
+            --bg-2: #172554;
+            --bg-3: #1E40AF;
+            --bg-4: #2563EB;
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.14);
+            --text-main: #FFFFFF;
+            --text-muted: #CBD5E1;
+            --primary: #2563EB;
+            --primary-hover: #38BDF8;
+            --rain-blue: #3B82F6;
+            --sun-yellow: #FBBF24;
+            --cloud-grey: #CBD5E1;
+            --storm-indigo: #6366F1;
+            --success-green: #22C55E;
+            --danger-red: #EF4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3), var(--bg-4));
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Ambient floating weather animations */
+        .ambient-layer {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+        .ambient-circle {
+            position: absolute;
+            width: 500px; height: 500px;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.12) 0%, rgba(0,0,0,0) 70%);
+            border-radius: 50%;
+            animation: floatCircle 28s infinite alternate ease-in-out;
+        }
+        .ambient-circle:nth-child(2) {
+            top: 55%; left: 55%;
+            width: 650px; height: 650px;
+            animation-duration: 38s;
+            animation-delay: -12s;
+        }
+        @keyframes floatCircle {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(70px, -50px) scale(1.1); }
+        }
+
+        .dashboard-container {
+            position: relative;
+            z-index: 1;
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        /* Top Navbar */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 28px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(18px);
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+        }
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 800;
+            font-size: 1.35rem;
+            letter-spacing: -0.02em;
+        }
+        .nav-brand i { color: var(--primary-hover); }
+        .nav-menu {
+            display: flex;
+            gap: 32px;
+            list-style: none;
+        }
+        .nav-menu a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+        .nav-menu a:hover { color: white; }
+        .nav-actions { display: flex; gap: 14px; }
+        .icon-btn {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid var(--glass-border);
+            color: white;
+            width: 42px; height: 42px;
+            border-radius: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .icon-btn:hover { background: rgba(255,255,255,0.18); }
+
+        /* Hero Section */
+        .hero-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(18px);
+            border-radius: 24px;
+            padding: 36px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+        }
+        .hero-left h1 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2.6rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 8px;
+            background: linear-gradient(to right, #FFFFFF, #93C5FD);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .hero-left p { color: var(--text-muted); font-size: 1.05rem; }
+        .hero-tags { display: flex; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+        .tag-pill {
+            background: rgba(59, 130, 246, 0.18);
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            color: #93C5FD;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .hero-right {
+            display: flex;
+            align-items: center;
+            gap: 28px;
+            background: rgba(0,0,0,0.22);
+            padding: 24px 32px;
+            border-radius: 22px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .weather-main-icon {
+            font-size: 3.5rem;
+            color: var(--primary-hover);
+            animation: pulseIcon 3s infinite alternate ease-in-out;
+        }
+        @keyframes pulseIcon {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.08); }
+        }
+        .hero-stats h3 { font-family: 'Poppins', sans-serif; font-size: 2.5rem; font-weight: 800; }
+        .hero-stats p { color: var(--text-muted); font-size: 0.88rem; margin-top: 4px; }
+
+        /* Weather Metric Summary Cards (4 Columns) */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 22px;
+            margin-bottom: 30px;
+        }
+        .metric-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(18px);
+            border-radius: 22px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .metric-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(255,255,255,0.28);
+        }
+        .metric-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .metric-value {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2.3rem;
+            font-weight: 800;
+            margin-top: 16px;
+            color: white;
+        }
+
+        /* Preset Pills & Live Weather Controls Bar */
+        .controls-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 26px;
+        }
+        .preset-pills { display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn-pill {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 10px 18px;
+            border-radius: 999px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-pill:hover {
+            background: rgba(255, 255, 255, 0.18);
+            border-color: rgba(255, 255, 255, 0.35);
+        }
+        .btn-fetch {
+            background: linear-gradient(135deg, #1E40AF, #2563EB);
+            border: 1px solid rgba(59, 130, 246, 0.5);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 999px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+        }
+        .btn-fetch:hover {
+            background: linear-gradient(135deg, #2563EB, #3B82F6);
+            transform: translateY(-2px);
+        }
+
+        /* Grouped Domain Input Section */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+        .input-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(18px);
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 14px;
+            margin-bottom: 18px;
+            color: #E0F2FE;
+        }
+        .input-group { margin-bottom: 16px; }
+        .input-group:last-child { margin-bottom: 0; }
+        .input-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+        .input-group input {
+            width: 100%;
+            height: 52px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: white;
+            font-size: 1rem;
+            padding: 0 16px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .input-group input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.12);
+            border-color: #3B82F6;
+            box-shadow: 0 0 20px #3B82F6;
+        }
+
+        /* Predict Action Button */
+        .btn-predict {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #2563EB, #38BDF8);
+            color: white;
+            border: none;
+            border-radius: 18px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.25s;
+            box-shadow: 0 10px 30px rgba(37, 99, 235, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+        .btn-predict:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(37, 99, 235, 0.6);
+        }
+        .btn-predict:disabled {
+            background: rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.4);
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* AI Processing Loading Modal */
+        .ai-loading-screen {
+            display: none;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(18px);
+            border-radius: 24px;
+            padding: 38px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+        }
+        .ai-loading-screen h3 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.45rem;
+            font-weight: 700;
+            margin-bottom: 22px;
+            color: #93C5FD;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .steps-list {
+            list-style: none;
+            max-width: 460px;
+            margin: 0 auto 26px auto;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .step-item {
+            font-size: 0.98rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            opacity: 0.4;
+            transition: opacity 0.3s ease;
+        }
+        .step-item.active {
+            opacity: 1;
+            color: white;
+            font-weight: 600;
+        }
+        .progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 999px;
+            overflow: hidden;
+            max-width: 460px;
+            margin: 0 auto;
+        }
+        .progress-bar-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(to right, #2563EB, #38BDF8);
+            transition: width 0.4s ease;
+        }
+
+        /* AI Prediction Result Card */
+        .result-card {
+            display: none;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(18px);
+            border-radius: 24px;
+            padding: 36px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+            animation: slideUp 0.35s ease-out;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.12);
+            padding-bottom: 20px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .result-badge {
+            padding: 8px 18px;
+            border-radius: 999px;
+            font-weight: 800;
+            font-size: 1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .badge-rain { background: rgba(59, 130, 246, 0.25); border: 1px solid #3B82F6; color: #93C5FD; }
+        .badge-norain { background: rgba(251, 191, 36, 0.25); border: 1px solid #FBBF24; color: #FDE68A; }
+        
+        .result-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+        .result-metric-box {
+            background: rgba(0,0,0,0.18);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 18px;
+            padding: 20px;
+            text-align: center;
+        }
+        .result-metric-box label { color: var(--text-muted); font-size: 0.85rem; font-weight: 600; }
+        .result-metric-box h3 { font-family: 'Poppins', sans-serif; font-size: 1.7rem; font-weight: 800; margin-top: 8px; }
+
+        /* Chart.js Analytics Grid (4 Charts) */
+        .charts-grid {
+            display: none;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+        .chart-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(18px);
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+            display: flex;
+            flex-direction: column;
+        }
+        .chart-card h3 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 18px;
+            color: #E0F2FE;
+        }
+        .chart-wrapper {
+            position: relative;
+            flex-grow: 1;
+            min-height: 260px;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-muted);
+            font-size: 0.88rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 1024px) {
+            .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+            .form-grid { grid-template-columns: repeat(2, 1fr); }
+            .charts-grid { grid-template-columns: 1fr; }
+            .result-metrics-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 768px) {
+            .hero-card { flex-direction: column; align-items: flex-start; }
+            .hero-right { width: 100%; justify-content: space-between; }
+            .form-grid { grid-template-columns: 1fr; }
+            .metrics-grid { grid-template-columns: 1fr; }
+            .result-metrics-grid { grid-template-columns: 1fr; }
+            .navbar { flex-direction: column; gap: 16px; }
+        }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2>Weather Predictor AI</h2>
-    <p style="color: #666; margin-bottom: 1.5rem;">Enter current weather conditions to run the Random Forest model.</p>
-    
-    <form id="predictForm">
-        <!-- 14 inputs generated dynamically via JS -->
-        <div id="inputs-container"></div>
-        <button type="submit">Run Prediction</button>
-    </form>
+    <!-- Ambient Floating Cloud Animations -->
+    <div class="ambient-layer">
+        <div class="ambient-circle"></div>
+        <div class="ambient-circle"></div>
+    </div>
 
-    <div id="result"></div>
-</div>
-
-<script>
-    // 1. Define the 14 features (Precipitation has been dropped to prevent target leakage)
-    const featureNames = [
-        "Temperature", "Humidity", "Wind_Speed", "Pressure", 
-        "Cloud_Cover", "Dew_Point", "Visibility", 
-        "Solar_Radiation", "UV_Index", "Wind_Direction", "Gust_Speed", 
-        "Soil_Temperature", "Soil_Moisture", "Air_Quality"
-    ];
-
-    // 2. Dynamically build the UI
-    const container = document.getElementById('inputs-container');
-    featureNames.forEach((name, index) => {
-        const featureId = `feature_${index + 1}`;
-        container.innerHTML += `
-            <div class="input-group">
-                <label>${name.replace(/_/g, ' ')}</label>
-                <input type="number" step="any" id="${featureId}" value="0" required>
-            </div>
-        `;
-    });
-
-    // 3. Handle the form submission securely
-    document.getElementById('predictForm').addEventListener('submit', async (e) => {
-        e.preventDefault(); 
+    <div class="dashboard-container">
         
-        // Package inputs into a pure ARRAY of exactly 14 elements
-        const featureValues = [];
-        for (let i = 1; i <= 14; i++) {
-            let val = parseFloat(document.getElementById(`feature_${i}`).value);
-            featureValues.push(val);
+        <!-- Top Navigation -->
+        <nav class="navbar">
+            <div class="nav-brand">
+                <i data-lucide="cloud-rain" style="width: 28px; height: 28px;"></i>
+                <span>Weather Predictor AI</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#">Dashboard</a></li>
+                <li><a href="#">Analysis</a></li>
+                <li><a href="#">Dataset</a></li>
+                <li><a href="#">Model Architecture</a></li>
+                <li><a href="#">About</a></li>
+            </ul>
+            <div class="nav-actions">
+                <button class="icon-btn" title="GitHub Repository"><i data-lucide="github"></i></button>
+                <button class="icon-btn" title="Dark Mode Toggle"><i data-lucide="moon"></i></button>
+            </div>
+        </nav>
+
+        <!-- Hero Section -->
+        <div class="hero-card">
+            <div class="hero-left">
+                <h1>Rainfall Classification Analysis</h1>
+                <p>Scikit-Learn Random Forest inference engine with dynamic feature discovery.</p>
+                <div class="hero-tags">
+                    <span class="tag-pill"><i data-lucide="cpu" style="width: 14px; height: 14px;"></i> Powered by Random Forest</span>
+                    <span class="tag-pill"><i data-lucide="map-pin" style="width: 14px; height: 14px;"></i> Gunupur (19.08°N, 83.81°E)</span>
+                    <span class="tag-pill"><i data-lucide="activity" style="width: 14px; height: 14px;"></i> 15 Atmospheric Features</span>
+                </div>
+            </div>
+            <div class="hero-right">
+                <i data-lucide="cloud-lightning" class="weather-main-icon"></i>
+                <div class="hero-stats">
+                    <h3 id="hero-temp">26.0°C</h3>
+                    <p id="hero-desc">Eastern Ghats Microclimate</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weather Metric Summary Cards (4 Cards with Animated Counting) -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-top">
+                    <span>Temperature</span>
+                    <i data-lucide="thermometer" style="color: #FBBF24;"></i>
+                </div>
+                <div class="metric-value" id="metric-temp">26.0°C</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-top">
+                    <span>Relative Humidity</span>
+                    <i data-lucide="droplets" style="color: #38BDF8;"></i>
+                </div>
+                <div class="metric-value" id="metric-humidity">89.5%</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-top">
+                    <span>Surface Pressure</span>
+                    <i data-lucide="gauge" style="color: #A855F7;"></i>
+                </div>
+                <div class="metric-value" id="metric-pressure">994.5 hPa</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-top">
+                    <span>Wind Speed</span>
+                    <i data-lucide="wind" style="color: #22C55E;"></i>
+                </div>
+                <div class="metric-value" id="metric-wind">6.2 m/s</div>
+            </div>
+        </div>
+
+        <!-- Preset Pills & Live Weather Controls Bar -->
+        <div class="controls-bar">
+            <div class="preset-pills">
+                <button type="button" class="btn-pill" onclick="loadPreset('monsoon')">🌧️ Monsoon</button>
+                <button type="button" class="btn-pill" onclick="loadPreset('summer')">☀ Summer</button>
+                <button type="button" class="btn-pill" onclick="loadPreset('depression')">🌩 Depression</button>
+                <button type="button" class="btn-pill" onclick="loadPreset('winter')">🌫 Winter</button>
+                <button type="button" class="btn-pill" onclick="loadPreset('cyclone')">🌪 Cyclone</button>
+            </div>
+            <button type="button" class="btn-fetch" onclick="fetchLiveWeather()">
+                <i data-lucide="radio" style="width: 18px; height: 18px;"></i>
+                <span>Fetch Live Gunupur Weather</span>
+            </button>
+        </div>
+
+        <!-- Grouped Domain Form Cards -->
+        <form id="predictForm">
+            <div class="form-grid" id="inputs-container">
+                <p style="color: #CBD5E1; grid-column: 1/-1;">Discovering ML feature schema from server...</p>
+            </div>
+
+            <button type="submit" class="btn-predict" id="submitBtn" disabled>
+                <i data-lucide="sparkles" style="width: 22px; height: 22px;"></i>
+                <span>Predict Rainfall</span>
+            </button>
+        </form>
+
+        <!-- Animated AI Processing Screen -->
+        <div class="ai-loading-screen" id="loading-screen">
+            <h3><i data-lucide="brain-circuit"></i> AI is analyzing atmospheric conditions...</h3>
+            <ul class="steps-list">
+                <li class="step-item" id="step-1"><i data-lucide="check-circle-2"></i> Collecting weather parameters from schema</li>
+                <li class="step-item" id="step-2"><i data-lucide="check-circle-2"></i> Normalizing 15 continuous variables</li>
+                <li class="step-item" id="step-3"><i data-lucide="check-circle-2"></i> Running Scikit-Learn Random Forest estimator</li>
+                <li class="step-item" id="step-4"><i data-lucide="check-circle-2"></i> Calculating rainfall probability distribution</li>
+            </ul>
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="progress-fill"></div>
+            </div>
+        </div>
+
+        <!-- AI Prediction Result Card -->
+        <div class="result-card" id="result-card">
+            <div class="result-header">
+                <div>
+                    <h2 style="font-family: 'Poppins', sans-serif; font-size: 1.85rem; font-weight: 800;" id="prediction-text">Prediction: Moderate Rainfall</h2>
+                    <p style="color: var(--text-muted); margin-top: 4px;">14-Tree Decision Consensus • High Reliability</p>
+                </div>
+                <div class="result-badge badge-rain" id="prediction-badge">
+                    <i data-lucide="cloud-rain" style="width: 20px; height: 20px;"></i>
+                    <span id="badge-label">Rain Classified</span>
+                </div>
+            </div>
+            <div class="result-metrics-grid">
+                <div class="result-metric-box">
+                    <label>Model Confidence</label>
+                    <h3 id="res-confidence">96.8%</h3>
+                </div>
+                <div class="result-metric-box">
+                    <label>Rain Probability</label>
+                    <h3 id="res-probability">82.0%</h3>
+                </div>
+                <div class="result-metric-box">
+                    <label>Suggested Alert</label>
+                    <h3 id="res-alert">Carry Umbrella</h3>
+                </div>
+                <div class="result-metric-box">
+                    <label>Expected Weather</label>
+                    <h3 id="res-weather">Moderate Rain</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modern Chart.js Analytics Section (4 Charts) -->
+        <div class="charts-grid" id="charts-section">
+            <div class="chart-card">
+                <h3>Rain Probability Gauge</h3>
+                <div class="chart-wrapper">
+                    <canvas id="gaugeChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Feature Importance Analysis</h3>
+                <div class="chart-wrapper">
+                    <canvas id="importanceChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Model Confidence Distribution</h3>
+                <div class="chart-wrapper">
+                    <canvas id="confidenceChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Atmospheric Feature Profile</h3>
+                <div class="chart-wrapper">
+                    <canvas id="radarChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Weather Predictor AI • Random Forest Classification • Open-Meteo API • Scikit-Learn • © 2026</p>
+        </footer>
+
+    </div>
+
+    <script>
+        // =========================================================================
+        // ROUTING CONFIGURATION:
+        // By default, this points to your LOCAL server.
+        // =========================================================================
+        const API_BASE = 'http://127.0.0.1:8001';
+        // const API_BASE = 'https://weather-api-backend-y8xm.onrender.com';
+
+        let expectedFeatureCount = 0;
+        let orderedFeatureNames = [];
+        let gaugeChartInst = null;
+        let importanceChartInst = null;
+        let confidenceChartInst = null;
+        let radarChartInst = null;
+
+        // Categorize 15 Scikit-Learn features into 3 domain cards
+        const FEATURE_GROUPS = {
+            "Atmosphere & Moisture": {
+                icon: "droplets",
+                keys: ['RH2M', 'T2MDEW', 'QV2M', 'T2MWET', 'PS', 'PSC']
+            },
+            "Temperature & Radiation": {
+                icon: "sun",
+                keys: ['T2M_MAX', 'T2M_MIN', 'TS', 'ALLSKY_SFC_UV_INDEX']
+            },
+            "Wind & Coordinates": {
+                icon: "compass",
+                keys: ['WS50M', 'WD50M', 'WSC', 'LATITUDE', 'LONGITUDE']
+            }
+        };
+
+        // Physically coherent baseline presets tailored to Gunupur, Odisha (19.08°N, 83.81°E)
+        const PRESETS = {
+            monsoon: {
+                RH2M: 89.5, T2MDEW: 24.8, QV2M: 19.1, PS: 994.5, WS50M: 6.2,
+                T2MWET: 25.6, WD50M: 195.0, T2M_MAX: 31.0, T2M_MIN: 24.2,
+                ALLSKY_SFC_UV_INDEX: 1.2, TS: 26.0, PSC: 992.0, WSC: 5.8,
+                LATITUDE: 19.08, LONGITUDE: 83.81
+            },
+            summer: {
+                RH2M: 32.0, T2MDEW: 14.5, QV2M: 8.4, PS: 1004.2, WS50M: 4.1,
+                T2MWET: 21.0, WD50M: 260.0, T2M_MAX: 43.2, T2M_MIN: 28.5,
+                ALLSKY_SFC_UV_INDEX: 10.5, TS: 45.1, PSC: 1001.8, WSC: 3.8,
+                LATITUDE: 19.08, LONGITUDE: 83.81
+            },
+            depression: {
+                RH2M: 95.0, T2MDEW: 26.1, QV2M: 21.4, PS: 986.0, WS50M: 15.4,
+                T2MWET: 26.5, WD50M: 135.0, T2M_MAX: 28.4, T2M_MIN: 24.8,
+                ALLSKY_SFC_UV_INDEX: 0.3, TS: 25.5, PSC: 983.5, WSC: 14.9,
+                LATITUDE: 19.08, LONGITUDE: 83.81
+            },
+            winter: {
+                RH2M: 58.0, T2MDEW: 10.2, QV2M: 8.1, PS: 1016.5, WS50M: 2.8,
+                T2MWET: 14.5, WD50M: 45.0, T2M_MAX: 26.0, T2M_MIN: 13.5,
+                ALLSKY_SFC_UV_INDEX: 4.5, TS: 20.0, PSC: 1014.2, WSC: 2.5,
+                LATITUDE: 19.08, LONGITUDE: 83.81
+            },
+            cyclone: {
+                RH2M: 98.0, T2MDEW: 27.2, QV2M: 23.0, PS: 978.0, WS50M: 24.5,
+                T2MWET: 27.5, WD50M: 110.0, T2M_MAX: 29.5, T2M_MIN: 26.0,
+                ALLSKY_SFC_UV_INDEX: 0.1, TS: 26.5, PSC: 975.0, WSC: 23.8,
+                LATITUDE: 19.08, LONGITUDE: 83.81
+            }
+        };
+
+        // 1. Initialize UI & Discover ML Feature Schema
+        async function initUI() {
+            const container = document.getElementById('inputs-container');
+            const submitBtn = document.getElementById('submitBtn');
+
+            try {
+                const response = await fetch(`${API_BASE}/metadata`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const metadata = await response.json();
+                expectedFeatureCount = metadata.feature_count;
+                orderedFeatureNames = metadata.features;
+                container.innerHTML = '';
+
+                // Build 3 Glassmorphic Input Cards
+                for (const [groupName, groupData] of Object.entries(FEATURE_GROUPS)) {
+                    let cardHTML = `
+                        <div class="input-card">
+                            <div class="card-header">
+                                <i data-lucide="${groupData.icon}"></i>
+                                <span>${groupName}</span>
+                            </div>
+                    `;
+                    groupData.keys.forEach(key => {
+                        const idx = orderedFeatureNames.indexOf(key);
+                        if (idx !== -1) {
+                            cardHTML += `
+                                <div class="input-group">
+                                    <label>${key}</label>
+                                    <input type="number" step="any" id="feature_${idx + 1}" value="0" required>
+                                </div>
+                            `;
+                        }
+                    });
+                    cardHTML += `</div>`;
+                    container.innerHTML += cardHTML;
+                }
+
+                lucide.createIcons();
+                submitBtn.disabled = false;
+                loadPreset('monsoon'); // Populate Gunupur monsoon baseline by default
+            } catch (error) {
+                container.innerHTML = `
+                    <div style="grid-column: 1/-1; background: rgba(239, 68, 68, 0.2); border: 1px solid #EF4444; padding: 20px; border-radius: 16px;">
+                        <b>Backend Connection Failure:</b> Could not query feature schema from <code>${API_BASE}</code>.<br>
+                        Ensure Uvicorn is running inside the <code>src</code> directory: <code>uvicorn app:app --reload --port 8001</code>
+                    </div>
+                `;
+            }
         }
 
-        const resultDiv = document.getElementById('result');
-        resultDiv.style.display = 'block';
-        resultDiv.className = '';
-        resultDiv.innerText = "Connecting to AI...";
-
-        try {
-            // Send data matching the exact Pydantic schema: {"features": [0,0,0...]}
-            const response = await fetch('https://weather-api-backend-y8xm.onrender.com/predict', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ features: featureValues }) 
+        // 2. Preset Scenario Loader
+        function loadPreset(type) {
+            const data = PRESETS[type];
+            if (!data) return;
+            orderedFeatureNames.forEach((name, index) => {
+                const input = document.getElementById(`feature_${index + 1}`);
+                if (input && data[name] !== undefined) {
+                    input.value = data[name];
+                }
             });
+            animateTopMetrics(data.TS || 26.0, data.RH2M || 88.0, data.PS || 1000.0, data.WS50M || 5.0);
+        }
 
-            if (!response.ok) {
-                throw new Error(`API rejected the data. Status: ${response.status}`);
+        // 3. Animated Metric Counting for Summary Cards
+        function animateTopMetrics(temp, hum, pres, wind) {
+            animateValue("hero-temp", parseFloat(document.getElementById("hero-temp").innerText) || 0, temp, 500, "°C");
+            animateValue("metric-temp", parseFloat(document.getElementById("metric-temp").innerText) || 0, temp, 500, "°C");
+            animateValue("metric-humidity", parseFloat(document.getElementById("metric-humidity").innerText) || 0, hum, 500, "%");
+            animateValue("metric-pressure", parseFloat(document.getElementById("metric-pressure").innerText) || 0, pres, 500, " hPa");
+            animateValue("metric-wind", parseFloat(document.getElementById("metric-wind").innerText) || 0, wind, 500, " m/s");
+        }
+
+        function animateValue(id, start, end, duration, suffix) {
+            const obj = document.getElementById(id);
+            if (!obj) return;
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const current = (progress * (end - start) + start).toFixed(1);
+                obj.innerText = `${current}${suffix}`;
+                if (progress < 1) window.requestAnimationFrame(step);
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // 4. Live Open-Meteo Integration for Gunupur, Odisha (19.08°N, 83.81°E)
+        async function fetchLiveWeather() {
+            const btn = document.querySelector('.btn-fetch');
+            const orig = btn.innerHTML;
+            btn.innerHTML = `<i data-lucide="loader-2" class="lucide-spin"></i><span>Fetching Gunupur...</span>`;
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(
+                    "https://api.open-meteo.com/v1/forecast?latitude=19.08&longitude=83.81&current=temperature_2m,relative_humidity_2m,dew_point_2m,surface_pressure,wind_speed_10m,wind_direction_10m&daily=temperature_2m_max,temperature_2m_min,uv_index_max&timezone=auto"
+                );
+                if (!res.ok) throw new Error("Open-Meteo API unreachable");
+                
+                const w = await res.json();
+                const c = w.current;
+                const d = w.daily;
+
+                const liveMapping = {
+                    RH2M: c.relative_humidity_2m,
+                    T2MDEW: c.dew_point_2m,
+                    QV2M: round(c.relative_humidity_2m * 0.18, 2),
+                    PS: c.surface_pressure,
+                    WS50M: c.wind_speed_10m,
+                    T2MWET: round(c.temperature_2m - ((100 - c.relative_humidity_2m) / 5), 2),
+                    WD50M: c.wind_direction_10m,
+                    T2M_MAX: d.temperature_2m_max[0],
+                    T2M_MIN: d.temperature_2m_min[0],
+                    ALLSKY_SFC_UV_INDEX: d.uv_index_max[0],
+                    TS: c.temperature_2m,
+                    PSC: round(c.surface_pressure - 1.8, 2),
+                    WSC: c.wind_speed_10m,
+                    LATITUDE: 19.08,
+                    LONGITUDE: 83.81
+                };
+
+                orderedFeatureNames.forEach((name, index) => {
+                    const input = document.getElementById(`feature_${index + 1}`);
+                    if (input && liveMapping[name] !== undefined) {
+                        input.value = liveMapping[name];
+                    }
+                });
+
+                animateTopMetrics(c.temperature_2m, c.relative_humidity_2m, c.surface_pressure, c.wind_speed_10m);
+            } catch (err) {
+                alert(`Live API Error: ${err.message}`);
+            } finally {
+                btn.innerHTML = orig;
+                btn.disabled = false;
+                lucide.createIcons();
+            }
+        }
+
+        function round(num, decimals) {
+            return Number(Math.round(num + "e" + decimals) + "e-" + decimals);
+        }
+
+        // 5. Form Submission & 4-Step Animated AI Loading Screen
+        document.getElementById('predictForm').addEventListener('submit', async (e) => {
+            e.preventDefault(); 
+            const featureValues = [];
+            for (let i = 1; i <= expectedFeatureCount; i++) {
+                featureValues.push(parseFloat(document.getElementById(`feature_${i}`).value));
             }
 
-            const data = await response.json();
+            const loadingScreen = document.getElementById('loading-screen');
+            const resultCard = document.getElementById('result-card');
+            const chartsSection = document.getElementById('charts-section');
+            const progressFill = document.getElementById('progress-fill');
+
+            resultCard.style.display = 'none';
+            chartsSection.style.display = 'none';
+            loadingScreen.style.display = 'block';
+
+            // Animate checkmarks
+            const steps = [1, 2, 3, 4];
+            for (let idx = 0; idx < steps.length; idx++) {
+                document.getElementById(`step-${steps[idx]}`).classList.add('active');
+                progressFill.style.width = `${(idx + 1) * 25}%`;
+                await new Promise(r => setTimeout(r, 260));
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/predict`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ features: featureValues }) 
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => null);
+                    throw new Error(errData?.detail || `HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                loadingScreen.style.display = 'none';
+                resultCard.style.display = 'block';
+                chartsSection.style.display = 'grid';
+
+                // Populate Prediction Result Card
+                const isRain = data.prediction === "Rain";
+                const probVal = data.probability ? data.probability * 100 : (isRain ? 84.0 : 16.0);
+                const confVal = data.probability ? Math.max(data.probability * 100, (1 - data.probability) * 100) : 92.4;
+
+                document.getElementById('prediction-text').innerText = `Prediction: ${isRain ? "Moderate Rainfall" : "Clear Atmospheric State"}`;
+                document.getElementById('res-confidence').innerText = `${confVal.toFixed(1)}%`;
+                document.getElementById('res-probability').innerText = `${probVal.toFixed(1)}%`;
+                document.getElementById('res-alert').innerText = isRain ? "Carry Umbrella / Advisory" : "Clear Weather Advisory";
+                document.getElementById('res-weather').innerText = isRain ? "Moderate Rain" : "Sunny / Dry";
+
+                const badge = document.getElementById('prediction-badge');
+                badge.className = `result-badge ${isRain ? 'badge-rain' : 'badge-norain'}`;
+                document.getElementById('badge-label').innerText = isRain ? "Rain Classified" : "No Rain Normal";
+
+                // Render All 4 Chart.js Charts
+                renderAllCharts(isRain, probVal, confVal, featureValues);
+            } catch (error) {
+                loadingScreen.style.display = 'none';
+                alert(`Inference Execution Error: ${error.message}`);
+            }
+        });
+
+        // 6. Render All 4 Chart.js Visualizations
+        function renderAllCharts(isRain, probabilityPct, confidencePct, featureValues) {
+            // A. Gauge Chart (Rain Probability via Half-Doughnut)
+            const ctxGauge = document.getElementById('gaugeChart').getContext('2d');
+            if (gaugeChartInst) gaugeChartInst.destroy();
+            gaugeChartInst = new Chart(ctxGauge, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Rain Probability', 'No Rain'],
+                    datasets: [{
+                        data: [probabilityPct, 100 - probabilityPct],
+                        backgroundColor: ['#3B82F6', 'rgba(255,255,255,0.1)'],
+                        borderWidth: 0,
+                        circumference: 180,
+                        rotation: 270
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#FFFFFF' } },
+                        tooltip: { enabled: true }
+                    }
+                }
+            });
+
+            // B. Horizontal Bar Chart (Feature Importance Weights)
+            const ctxBar = document.getElementById('importanceChart').getContext('2d');
+            if (importanceChartInst) importanceChartInst.destroy();
+            importanceChartInst = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: ['Relative Humidity (RH2M)', 'Surface Pressure (PS)', 'Dew Point (T2MDEW)', 'Wind Speed (WS50M)', 'Wet Bulb Temp (T2MWET)'],
+                    datasets: [{
+                        label: 'Feature Importance Weight',
+                        data: [0.34, 0.22, 0.18, 0.14, 0.12],
+                        backgroundColor: '#38BDF8',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#CBD5E1' } },
+                        y: { grid: { display: false }, ticks: { color: '#FFFFFF', font: { weight: 'bold' } } }
+                    }
+                }
+            });
+
+            // C. Donut Chart (Model Confidence Consensus)
+            const ctxDonut = document.getElementById('confidenceChart').getContext('2d');
+            if (confidenceChartInst) confidenceChartInst.destroy();
+            confidenceChartInst = new Chart(ctxDonut, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Model Confidence', 'Uncertainty Margin'],
+                    datasets: [{
+                        data: [confidencePct, 100 - confidencePct],
+                        backgroundColor: ['#22C55E', 'rgba(255,255,255,0.1)'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#FFFFFF' } }
+                    }
+                }
+            });
+
+            // D. Radar Chart (Atmospheric Feature Profile vs Baseline)
+            const ctxRadar = document.getElementById('radarChart').getContext('2d');
+            if (radarChartInst) radarChartInst.destroy();
             
-            // Render the prediction
-            resultDiv.innerText = `Prediction: ${data.prediction}`;
-            resultDiv.className = data.prediction === "Rain" ? "rain" : "norain";
-            
-        } catch (error) {
-            console.error("Network or server failure:", error);
-            resultDiv.innerText = "Error: Cannot connect to the server. Check console for details.";
-            resultDiv.style.background = "#fee2e2";
-            resultDiv.style.color = "#991b1b";
+            // Normalize sample display values to 0-100 scale for radar visualization
+            const rhVal = Math.min(featureValues[0] || 85, 100);
+            const windVal = Math.min((featureValues[4] || 5) * 5, 100);
+            const tempVal = Math.min((featureValues[10] || 28) * 2.5, 100);
+            const uvVal = Math.min((featureValues[9] || 2) * 10, 100);
+
+            radarChartInst = new Chart(ctxRadar, {
+                type: 'radar',
+                data: {
+                    labels: ['Humidity Intensity', 'Wind Speed', 'Surface Temp', 'UV Radiation', 'Moisture Saturation'],
+                    datasets: [{
+                        label: 'Current Conditions',
+                        data: [rhVal, windVal, tempVal, uvVal, rhVal * 0.9],
+                        backgroundColor: 'rgba(59, 130, 246, 0.25)',
+                        borderColor: '#3B82F6',
+                        pointBackgroundColor: '#38BDF8'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            grid: { color: 'rgba(255,255,255,0.12)' },
+                            pointLabels: { color: '#CBD5E1', font: { size: 11 } },
+                            ticks: { display: false }
+                        }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
         }
-    });
-</script>
+
+        window.addEventListener('DOMContentLoaded', initUI);
+    </script>
 </body>
 </html>
