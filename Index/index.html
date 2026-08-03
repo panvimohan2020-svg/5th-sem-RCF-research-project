@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Predictor AI — Enterprise MLOps Dashboard</title>
+    <!-- Fonts: Inter & Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js 4.x -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom Stylessheet -->
+    <link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+    <!-- Ambient Floating Cloud Animations -->
+    <div class="ambient-layer">
+        <div class="ambient-circle"></div>
+        <div class="ambient-circle"></div>
+    </div>
+
+    <div class="dashboard-container">
+        
+        <!-- Top Navigation -->
+        <nav class="navbar">
+            <div class="nav-brand">
+                <i data-lucide="cloud-rain" style="width: 28px; height: 28px;"></i>
+                <span>Weather Predictor AI</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#">Dashboard</a></li>
+                <li><a href="#">Analysis</a></li>
+                <li><a href="#">Dataset</a></li>
+                <li><a href="#">Model Architecture</a></li>
+                <li><a href="#">About</a></li>
+            </ul>
+            <div class="nav-actions">
+                <button class="icon-btn" title="GitHub Repository"><i data-lucide="github"></i></button>
+                <button class="icon-btn" title="Dark Mode Toggle"><i data-lucide="moon"></i></button>
+            </div>
+        </nav>
+
+        <!-- Hero Section -->
+        <div class="hero-card">
+            <div class="hero-left">
+                <h1>Rainfall Classification Analysis</h1>
+                <p>Scikit-Learn Random Forest inference engine with dynamic feature discovery.</p>
+                <div class="hero-tags">
+                    <span class="tag-pill"><i data-lucide="cpu" style="width: 14px; height: 14px;"></i> Powered by Random Forest</span>
+                    <span class="tag-pill"><i data-lucide="map-pin" style="width: 14px; height: 14px;"></i> Gunupur (19.08°N, 83.81°E)</span>
+                    <span class="tag-pill"><i data-lucide="activity" style="width: 14px; height: 14px;"></i> 15 Atmospheric Features</span>
+                </div>
+            </div>
+            <div class="hero-right">
+                <i data-lucide="cloud-lightning" class="weather-main-icon"></i>
+                <div class="hero-stats">
+                    <h3 id="hero-temp">26.0°C</h3>
+                    <p id="hero-desc">Eastern Ghats Microclimate</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weather Metric Summary Cards (4 Cards with Animated Counting) -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-top">
+                    <span>Temperature</span>
+                    <i data-lucide="thermometer" style="color: #FBBF24;"></i>
+                </div>
+                <div class="metric-value" id="metric-temp">26.0°C</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-top">
+                    <span>Relative Humidity</span>
+                    <i data-lucide="droplets" style="color: #38BDF8;"></i>
+                </div>
+                <div class="metric-value" id="metric-humidity">89.5%</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-top">
+                    <span>Surface Pressure</span>
+                    <i data-lucide="gauge" style="color: #A855F7;"></i>
+                </div>
+                <div class="metric-value" id="metric-pressure">994.5 hPa</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-top">
+                    <span>Wind Speed</span>
+                    <i data-lucide="wind" style="color: #22C55E;"></i>
+                </div>
+                <div class="metric-value" id="metric-wind">6.2 m/s</div>
+            </div>
+        </div>
+
+        <!-- Preset Pills & Live Weather Controls Bar -->
+        <div class="controls-bar">
+            <div class="preset-pills">
+                <button type="button" class="btn-pill" onclick="loadPreset('monsoon')">🌧️ Monsoon</button>
+                <button type="button" class="btn-pill" onclick="loadPreset('summer')">☀ Summer</button>
+                <button type="button" class="btn-pill" onclick="loadPreset('depression')">🌩 Depression</button>
+                <button type="button" class="btn-pill" onclick="loadPreset('winter')">🌫 Winter</button>
+                <button type="button" class="btn-pill" onclick="loadPreset('cyclone')">🌪 Cyclone</button>
+            </div>
+            <button type="button" class="btn-fetch" onclick="fetchLiveWeather()">
+                <i data-lucide="radio" style="width: 18px; height: 18px;"></i>
+                <span>Fetch Live Gunupur Weather</span>
+            </button>
+        </div>
+
+        <!-- Grouped Domain Form Cards -->
+        <form id="predictForm">
+            <div class="form-grid" id="inputs-container">
+                <p style="color: #CBD5E1; grid-column: 1/-1;">Discovering ML feature schema from server...</p>
+            </div>
+
+            <button type="submit" class="btn-predict" id="submitBtn" disabled>
+                <i data-lucide="sparkles" style="width: 22px; height: 22px;"></i>
+                <span>Predict Rainfall</span>
+            </button>
+        </form>
+
+        <!-- Animated AI Processing Screen -->
+        <div class="ai-loading-screen" id="loading-screen">
+            <h3><i data-lucide="brain-circuit"></i> AI is analyzing atmospheric conditions...</h3>
+            <ul class="steps-list">
+                <li class="step-item" id="step-1"><i data-lucide="check-circle-2"></i> Collecting weather parameters from schema</li>
+                <li class="step-item" id="step-2"><i data-lucide="check-circle-2"></i> Normalizing 15 continuous variables</li>
+                <li class="step-item" id="step-3"><i data-lucide="check-circle-2"></i> Running Scikit-Learn Random Forest estimator</li>
+                <li class="step-item" id="step-4"><i data-lucide="check-circle-2"></i> Calculating rainfall probability distribution</li>
+            </ul>
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="progress-fill"></div>
+            </div>
+        </div>
+
+        <!-- AI Prediction Result Card -->
+        <div class="result-card" id="result-card">
+            <div class="result-header">
+                <div>
+                    <h2 style="font-family: 'Poppins', sans-serif; font-size: 1.85rem; font-weight: 800;" id="prediction-text">Prediction: Moderate Rainfall</h2>
+                    <p style="color: var(--text-muted); margin-top: 4px;">14-Tree Decision Consensus • High Reliability</p>
+                </div>
+                <div class="result-badge badge-rain" id="prediction-badge">
+                    <i data-lucide="cloud-rain" style="width: 20px; height: 20px;"></i>
+                    <span id="badge-label">Rain Classified</span>
+                </div>
+            </div>
+            <div class="result-metrics-grid">
+                <div class="result-metric-box">
+                    <label>Model Confidence</label>
+                    <h3 id="res-confidence">96.8%</h3>
+                </div>
+                <div class="result-metric-box">
+                    <label>Rain Probability</label>
+                    <h3 id="res-probability">82.0%</h3>
+                </div>
+                <div class="result-metric-box">
+                    <label>Suggested Alert</label>
+                    <h3 id="res-alert">Carry Umbrella</h3>
+                </div>
+                <div class="result-metric-box">
+                    <label>Expected Weather</label>
+                    <h3 id="res-weather">Moderate Rain</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modern Chart.js Analytics Section (4 Charts) -->
+        <div class="charts-grid" id="charts-section">
+            <div class="chart-card">
+                <h3>Rain Probability Gauge</h3>
+                <div class="chart-wrapper">
+                    <canvas id="gaugeChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Feature Importance Analysis</h3>
+                <div class="chart-wrapper">
+                    <canvas id="importanceChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Model Confidence Distribution</h3>
+                <div class="chart-wrapper">
+                    <canvas id="confidenceChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Atmospheric Feature Profile</h3>
+                <div class="chart-wrapper">
+                    <canvas id="radarChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Weather Predictor AI • Random Forest Classification • Open-Meteo API • Scikit-Learn • © 2026</p>
+        </footer>
+
+    </div>
+
+    <!-- Application JavaScript -->
+   <script src="app.js" defer></script>
+</body>
+</html>
