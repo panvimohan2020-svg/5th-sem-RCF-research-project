@@ -7,18 +7,23 @@ import joblib
 import numpy as np
 import pandas as pd
 import logging
+import os
 
 logger = logging.getLogger("uvicorn.error")
+
+# Dynamically resolve path to models/weather_predictor.pkl relative to this file (src/app.py)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "..", "models", "weather_predictor.pkl")
 
 # 1. Lifespan Manager for ML Artifacts
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        app.state.model = joblib.load("../models/weather_predictor.pkl")
-        logger.info("Model loaded successfully into app.state.")
+        app.state.model = joblib.load(MODEL_PATH)
+        logger.info(f"Model loaded successfully from {MODEL_PATH} into app.state.")
         yield
     except FileNotFoundError:
-        logger.critical("CRITICAL: weather_predictor.pkl not found.")
+        logger.critical(f"CRITICAL: weather_predictor.pkl not found at {MODEL_PATH}.")
         raise RuntimeError("Model artifact missing; shutting down.")
     finally:
         app.state.model = None
