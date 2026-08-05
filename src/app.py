@@ -10,6 +10,7 @@ os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
+import gc
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,19 +27,23 @@ logger = logging.getLogger("uvicorn.error")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "..", "models", "weather_predictor.pkl")
 
-# 1. Lifespan Manager for ML Artifacts (Memory-Mapped for Low RAM Footprint)
+# 1. Lifespan Manager for ML Artifacts (Memory-Mapped + GC Sweep)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
         # mmap_mode='r' reads tree arrays directly from disk without duplicating them in heap RAM
         app.state.model = joblib.load(MODEL_PATH, mmap_mode="r")
         logger.info(f"✅ Model loaded successfully from {MODEL_PATH} into app.state (mmap_mode='r').")
+        
+        # Force immediate cleanup of import and initialization memory residue
+        gc.collect()
         yield
     except FileNotFoundError:
         logger.critical(f"❌ CRITICAL: weather_predictor.pkl not found at {MODEL_PATH}.")
         raise RuntimeError("Model artifact missing; shutting down.")
     finally:
         app.state.model = None
+        gc.collect()
 
 app = FastAPI(
     title="Weather Predictor AI API",
