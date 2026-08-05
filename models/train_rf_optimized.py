@@ -83,7 +83,7 @@ def train_gunupur_model():
     roc = roc_auc_score(y_test, y_prob)
     
     print("\n========================================================")
-    print("          GUNUPUR MODEL PERFORMANCE DEFENSE SUMMARY      ")
+    print("         GUNUPUR MODEL PERFORMANCE DEFENSE SUMMARY      ")
     print("========================================================")
     print(f"  Out-of-Sample F1-Score   : {f1:.4f}")
     print(f"  ROC-AUC Discriminability : {roc:.4f}")
@@ -92,13 +92,15 @@ def train_gunupur_model():
     print("\nDetailed Classification Report:")
     print(classification_report(y_test, y_pred, target_names=['No Rain (0)', 'Rain (1)']))
     
-    # 8. Serialize and Export Production Binary
+    # 8. Serialize and Export Production Binary (UNCOMPRESSED for zero-RAM memory mapping)
     output_model_path = os.path.join(project_root, "models", "weather_predictor.pkl")
-    joblib.dump(calibrated_model, output_model_path, compress=3)
+    
+    # CRITICAL: compress=0 is mandatory so Linux can memory-map directly from disk without heap RAM spikes
+    joblib.dump(calibrated_model, output_model_path, compress=0)
     
     file_size_mb = os.path.getsize(output_model_path) / (1024 * 1024)
-    print(f"\n✅ Successfully exported calibrated Gunupur model to: {output_model_path}")
-    print(f"📦 Binary File Size: {file_size_mb:.2f} MB (Optimized for 512MB Cloud Containers)")
+    print(f"\n✅ Successfully exported uncompressed calibrated Gunupur model to: {output_model_path}")
+    print(f"📦 Binary File Size: {file_size_mb:.2f} MB (Ready for zero-RAM mmap_mode='r' on Render)")
 
 if __name__ == "__main__":
     train_gunupur_model()
