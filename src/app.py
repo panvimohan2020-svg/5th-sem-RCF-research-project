@@ -1,3 +1,15 @@
+import os
+
+# =====================================================================
+# ZERO-DAY OOM DEFENSE: Clamp Threading Arenas BEFORE importing BLAS/ML
+# Prevents Linux OpenMP/MKL from allocating 300MB+ RAM during startup
+# =====================================================================
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +19,6 @@ import joblib
 import numpy as np
 import pandas as pd
 import logging
-import os
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -15,15 +26,16 @@ logger = logging.getLogger("uvicorn.error")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "..", "models", "weather_predictor.pkl")
 
-# 1. Lifespan Manager for ML Artifacts
+# 1. Lifespan Manager for ML Artifacts (Memory-Mapped for Low RAM Footprint)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        app.state.model = joblib.load(MODEL_PATH)
-        logger.info(f"Model loaded successfully from {MODEL_PATH} into app.state.")
+        # mmap_mode='r' reads tree arrays directly from disk without duplicating them in heap RAM
+        app.state.model = joblib.load(MODEL_PATH, mmap_mode="r")
+        logger.info(f"✅ Model loaded successfully from {MODEL_PATH} into app.state (mmap_mode='r').")
         yield
     except FileNotFoundError:
-        logger.critical(f"CRITICAL: weather_predictor.pkl not found at {MODEL_PATH}.")
+        logger.critical(f"❌ CRITICAL: weather_predictor.pkl not found at {MODEL_PATH}.")
         raise RuntimeError("Model artifact missing; shutting down.")
     finally:
         app.state.model = None
