@@ -7,7 +7,7 @@ from sklearn.preprocessing import LabelEncoder
 import sys
 
 # 1. Load your dataset using the verified raw string path
-file_path = r'C:\Users\lenovo\OneDrive\Documents\5th sem RCF research project\Rainfall_Classification_Project\Data\Raw\Rainfall_India.csv\UP_rainfall_dataset.csv'
+file_path = r'C:\Users\lenovo\OneDrive\Documents\5th sem RCF research project\Rainfall_Classification_Project\Data\Raw\Processed'
 
 try:
     df = pd.read_csv(file_path)
