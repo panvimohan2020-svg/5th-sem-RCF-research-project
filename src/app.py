@@ -1,4 +1,15 @@
 import os
+import gc
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from typing import List
+import joblib
+import numpy as np
+import pandas as pd
+import logging
 
 # =====================================================================
 # ZERO-DAY OOM DEFENSE: Clamp Threading Arenas BEFORE importing BLAS/ML
@@ -10,32 +21,17 @@ os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
-import gc
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from typing import List
-import joblib
-import numpy as np
-import pandas as pd
-import logging
-
 logger = logging.getLogger("uvicorn.error")
 
-# Dynamically resolve path to models/weather_predictor.pkl relative to this file (src/app.py)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "..", "models", "weather_predictor.pkl")
 
-# 1. Lifespan Manager for ML Artifacts (Memory-Mapped + GC Sweep)
+# 1. Lifespan Manager for ML Artifacts
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        # mmap_mode='r' reads tree arrays directly from disk without duplicating them in heap RAM
         app.state.model = joblib.load(MODEL_PATH, mmap_mode="r")
-        logger.info(f"✅ Model loaded successfully from {MODEL_PATH} into app.state (mmap_mode='r').")
-        
-        # Force immediate cleanup of import and initialization memory residue
+        logger.info(f"✅ Model loaded successfully from {MODEL_PATH}")
         gc.collect()
         yield
     except FileNotFoundError:
@@ -45,92 +41,122 @@ async def lifespan(app: FastAPI):
         app.state.model = None
         gc.collect()
 
-app = FastAPI(
-    title="Weather Predictor AI API",
-    version="1.0.0",
-    lifespan=lifespan
-)
+app = FastAPI(title="Gunupur WRI Weather API", version="2.0.0", lifespan=lifespan)
 
-# 2. CORS Configuration for Local Dev & Production
+# 2. CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
-        "*"
-    ],
-    allow_credentials=False,  # Must be False when "*" is included in allow_origins
-    allow_methods=["*"],      # Allows POST, GET, and browser OPTIONS preflight requests
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# 3. Pydantic Schemas
+# 3. Pydantic Schemas (Updated for Frontend Compatibility)
+class WeatherInput(BaseModel):
+    RH2M: float
+    T2MDEW: float
+    QV2M: float
+    T2MWET: float
+    PS: float
+    PSC: float
+    TS: float
+    T2M_MAX: float
+    T2M_MIN: float
+    ALLSKY_SFC_UV_INDEX: float
+    WS50M: float
+    WD50M: float
+    WSC: float
+    LATITUDE: float
+    LONGITUDE: float
+
 class ModelMetadataResponse(BaseModel):
     features: List[str]
     feature_count: int
     model_type: str
 
-class WeatherPayload(BaseModel):
-    # Enforces exactly 15 numerical inputs matching model.feature_names_in_
-    features: List[float] = Field(..., min_length=15, max_length=15)
+# 4. The Research Component: Workability Risk Index (WRI)
+def calculate_workability_index(rain_prob: float, t2m_max: float, wind_speed: float) -> dict:
+    base_score = 10.0
+    
+    # Mathematical Penalties
+    rain_penalty = rain_prob * 6.0
+    heat_penalty = max(0.0, (t2m_max - 32.0) * 0.3)
+    wind_penalty = max(0.0, (wind_speed - 12.0) * 0.2)
+    
+    # Final Score (clamped between 0 and 10)
+    wri_score = round(max(0.0, base_score - rain_penalty - heat_penalty - wind_penalty), 1)
+    
+    if wri_score >= 7.5:
+        return {
+            "score": wri_score,
+            "status": "GREEN - Favorable",
+            "farmer_advice": "Ideal conditions for sowing and pesticide spraying.",
+            "labor_advice": "Safe for all outdoor construction and manual labor."
+        }
+    elif wri_score >= 4.5:
+        return {
+            "score": wri_score,
+            "status": "YELLOW - Marginal Risk",
+            "farmer_advice": "Caution: Avoid spraying chemicals. Rain or wind may cause runoff.",
+            "labor_advice": "Plan indoor tasks if possible. Ensure hydration if heat penalty is high."
+        }
+    else:
+        return {
+            "score": wri_score,
+            "status": "RED - Critical Disruption",
+            "farmer_advice": "Halt field operations. High risk of crop damage or chemical runoff.",
+            "labor_advice": "High risk of wage loss. Halt outdoor pouring and scaffolding work."
+        }
 
-class PredictionResponse(BaseModel):
-    prediction: str
-    probability: float
-    raw_class: int
-
-# 4. Metadata Discovery Endpoint (Decouples Frontend from Hardcoded Arrays)
-@app.get("/metadata", response_model=ModelMetadataResponse)
+# 5. Metadata Endpoint
+@app.get("/api/model-info", response_model=ModelMetadataResponse)
 def get_model_metadata(request: Request):
+    model = request.app.state.model
+    return {
+        "features": list(model.feature_names_in_),
+        "feature_count": len(model.feature_names_in_),
+        "model_type": type(model).__name__
+    }
+
+# 6. Prescriptive Inference Endpoint
+@app.post("/api/predict")
+def predict_weather(payload: WeatherInput, request: Request):
     try:
         model = request.app.state.model
-        return {
-            "features": list(model.feature_names_in_),
-            "feature_count": len(model.feature_names_in_),
-            "model_type": type(model).__name__
-        }
-    except AttributeError:
-        raise HTTPException(
-            status_code=500, 
-            detail="Loaded model artifact lacks .feature_names_in_ attribute."
+        
+        # Dynamically map the Pydantic JSON to the exact column order the model expects
+        input_dict = payload.model_dump()
+        feature_values = [input_dict[f] for f in model.feature_names_in_]
+        
+        # Guard against NaN/Infinity
+        if not np.isfinite(feature_values).all():
+            raise HTTPException(status_code=422, detail="Input features contain NaN or infinite values.")
+            
+        input_data = pd.DataFrame([feature_values], columns=model.feature_names_in_)
+
+        # Extract Class and Probability
+        prediction_class = int(model.predict(input_data)[0])
+        probs = model.predict_proba(input_data)[0]
+        rain_prob = float(probs[1]) # Probability of class 1 (Rain)
+        
+        # Calculate Research WRI
+        wri_data = calculate_workability_index(
+            rain_prob=rain_prob, 
+            t2m_max=payload.T2M_MAX, 
+            wind_speed=payload.WS50M
         )
 
-# 5. DataFrame-Aware Inference Endpoint
-@app.post("/predict", response_model=PredictionResponse)
-def predict_weather(payload: WeatherPayload, request: Request):
-    try:
-        # Step A: Guard against NaN or infinite numerical poisoning
-        raw_array = np.array(payload.features, dtype=np.float32)
-        if not np.isfinite(raw_array).all():
-            raise HTTPException(
-                status_code=422, 
-                detail="Input features contain NaN or infinite values."
-            )
-
-        # Step B: Retrieve the loaded model from application state
-        model = request.app.state.model
-
-        # Step C: Dynamically map incoming numbers to the EXACT columns the model was trained on
-        input_data = pd.DataFrame([payload.features], columns=model.feature_names_in_)
-
-        # Step D: Execute model prediction
-        prediction_class = int(model.predict(input_data)[0])
-        
-        # Step E: Retrieve probability confidence score if supported by estimator
-        probability = 0.0
-        if hasattr(model, "predict_proba"):
-            probs = model.predict_proba(input_data)[0]
-            probability = float(probs[prediction_class])
-
         return {
-            "prediction": "Rain" if prediction_class == 1 else "No Rain",
-            "probability": round(probability, 4),
-            "raw_class": prediction_class
+            "prediction_class": prediction_class,
+            "rain_probability": round(rain_prob * 100, 2),
+            "workability_index": wri_data
         }
 
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.exception("Inference failure during /predict execution")
-        # Return exact Python exception text to client for transparent debugging
-        raise HTTPException(status_code=500, detail=f"Inference crash: {str(e)}")
+        logger.exception("Inference failure")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 7. Serve Frontend Dashboard (Must be at the bottom)
+INDEX_DIR = os.path.join(BASE_DIR, "..", "Index")
+app.mount("/", StaticFiles(directory=INDEX_DIR, html=True), name="static")

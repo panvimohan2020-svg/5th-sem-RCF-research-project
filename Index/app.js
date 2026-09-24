@@ -2,7 +2,8 @@
 // ROUTING CONFIGURATION:
 // Pointing to your live Render cloud server
 // =========================================================================
-const API_BASE = 'https://weather-ai-backend-0prx.onrender.com';
+const API_BASE = '/api';
+// If testing locally, temporarily change API_BASE to: 'http://127.0.0.1:8001'
 
 let expectedFeatureCount = 0;
 let orderedFeatureNames = [];
@@ -63,11 +64,18 @@ const PRESETS = {
 
 // 1. Initialize UI & Discover ML Feature Schema
 async function initUI() {
+    // Ultimate safeguard: If they aren't on the backend server, redirect them immediately.
+    if (window.location.protocol === 'file:' || window.location.port === '5500') {
+        alert("You must run this app directly from the AI Server!\n\nRedirecting you to http://127.0.0.1:8001/ now...");
+        window.location.href = "http://127.0.0.1:8001/";
+        return;
+    }
+
     const container = document.getElementById('inputs-container');
     const submitBtn = document.getElementById('submitBtn');
 
     try {
-        const response = await fetch(`${API_BASE}/metadata`);
+        const response = await fetch(`${API_BASE}/model-info`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
         const metadata = await response.json();
@@ -230,12 +238,20 @@ function round(num, decimals) {
     return Number(Math.round(num + "e" + decimals) + "e-" + decimals);
 }
 
-// 5. Form Submission & 4-Step Animated AI Loading Screen
+// =========================================================================
+// 5. PHASE 2: WRI INFERENCE EXECUTION
+// Maps frontend data to labeled dictionary payload expected by FastAPI
+// =========================================================================
 document.getElementById('predictForm').addEventListener('submit', async (e) => {
     e.preventDefault(); 
-    const featureValues = [];
+    
+    // BUILD LABELED DICTIONARY FOR THE NEW BACKEND SCHEMA
+    const payload = {};
+    const featureValues = []; // Keep array for charts
     for (let i = 1; i <= expectedFeatureCount; i++) {
-        featureValues.push(parseFloat(document.getElementById(`feature_${i}`).value));
+        const val = parseFloat(document.getElementById(`feature_${i}`).value);
+        payload[orderedFeatureNames[i-1]] = val;
+        featureValues.push(val);
     }
 
     const loadingScreen = document.getElementById('loading-screen');
@@ -245,12 +261,12 @@ document.getElementById('predictForm').addEventListener('submit', async (e) => {
 
     resultCard.style.display = 'none';
     chartsSection.style.display = 'none';
-    loadingScreen.style.display = 'block';
+    loadingScreen.style.display = 'flex'; // Ensure flex layout for loading screen
 
     // Animate checkmarks
     const steps = [1, 2, 3, 4];
     for (let idx = 0; idx < steps.length; idx++) {
-        document.getElementById(`step-${steps[idx]}`).classList.add('active');
+        document.getElementById(`step-${steps[idx]}`).style.color = "#38BDF8"; // Highlight active step
         progressFill.style.width = `${(idx + 1) * 25}%`;
         await new Promise(r => setTimeout(r, 260));
     }
@@ -259,7 +275,7 @@ document.getElementById('predictForm').addEventListener('submit', async (e) => {
         const response = await fetch(`${API_BASE}/predict`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ features: featureValues }) 
+            body: JSON.stringify(payload) // SEND LABELED DICTIONARY
         });
 
         if (!response.ok) {
@@ -273,22 +289,27 @@ document.getElementById('predictForm').addEventListener('submit', async (e) => {
         resultCard.style.display = 'block';
         chartsSection.style.display = 'grid';
 
-        // Populate Prediction Result Card
-        const isRain = data.prediction === "Rain";
-        const probVal = data.probability ? data.probability * 100 : (isRain ? 84.0 : 16.0);
-        const confVal = data.probability ? Math.max(data.probability * 100, (1 - data.probability) * 100) : 92.4;
+        // EXTRACT NEW WRI DATA
+        const wri = data.workability_index;
+        const isRain = data.prediction_class === 1;
+        const probVal = data.rain_probability;
+        const confVal = (wri.score / 10) * 100; // Map WRI score to percentage for the donut chart
 
-        document.getElementById('prediction-text').innerText = `Prediction: ${isRain ? "Moderate Rainfall" : "Clear Atmospheric State"}`;
-        document.getElementById('res-confidence').innerText = `${confVal.toFixed(1)}%`;
+        // Populate Prediction Result Card with WRI logic
+        document.getElementById('prediction-text').innerText = isRain ? "Precipitation Expected" : "Favorable Work Conditions";
+        document.getElementById('res-confidence').innerText = `${wri.score}/10`;
         document.getElementById('res-probability').innerText = `${probVal.toFixed(1)}%`;
-        document.getElementById('res-alert').innerText = isRain ? "Carry Umbrella / Advisory" : "Clear Weather Advisory";
-        document.getElementById('res-weather').innerText = isRain ? "Moderate Rain" : "Sunny / Dry";
+        
+        // Extract just the GREEN/YELLOW/RED status word for the badge
+        document.getElementById('res-alert').innerText = wri.status.split('-')[0].trim();
+        document.getElementById('res-weather').innerText = wri.farmer_advice;
 
+        // Dynamic Badge Styling based on WRI Score
         const badge = document.getElementById('prediction-badge');
-        badge.className = `result-badge ${isRain ? 'badge-rain' : 'badge-norain'}`;
-        document.getElementById('badge-label').innerText = isRain ? "Rain Classified" : "No Rain Normal";
+        badge.style.backgroundColor = wri.score >= 7.5 ? "#22C55E" : (wri.score >= 4.5 ? "#F59E0B" : "#EF4444");
+        document.getElementById('badge-label').innerText = wri.status;
 
-        // Render All 4 Chart.js Charts
+        // Render All Chart.js Visualizations
         renderAllCharts(isRain, probVal, confVal, featureValues);
     } catch (error) {
         loadingScreen.style.display = 'none';
@@ -296,7 +317,9 @@ document.getElementById('predictForm').addEventListener('submit', async (e) => {
     }
 });
 
-// 6. Render All 4 Chart.js Visualizations
+// =========================================================================
+// 6. VISUALIZATION ENGINE (Chart.js Integrations)
+// =========================================================================
 function renderAllCharts(isRain, probabilityPct, confidencePct, featureValues) {
     // A. Gauge Chart (Rain Probability via Half-Doughnut)
     const ctxGauge = document.getElementById('gaugeChart').getContext('2d');
@@ -304,7 +327,7 @@ function renderAllCharts(isRain, probabilityPct, confidencePct, featureValues) {
     gaugeChartInst = new Chart(ctxGauge, {
         type: 'doughnut',
         data: {
-            labels: ['Rain Probability', 'No Rain'],
+            labels: ['Rain Risk', 'Dry Probability'],
             datasets: [{
                 data: [probabilityPct, 100 - probabilityPct],
                 backgroundColor: ['#3B82F6', 'rgba(255,255,255,0.1)'],
@@ -324,52 +347,56 @@ function renderAllCharts(isRain, probabilityPct, confidencePct, featureValues) {
     });
 
     // B. Horizontal Bar Chart (Feature Importance Weights)
-    const ctxBar = document.getElementById('importanceChart').getContext('2d');
-    if (importanceChartInst) importanceChartInst.destroy();
-    importanceChartInst = new Chart(ctxBar, {
-        type: 'bar',
-        data: {
-            labels: ['Relative Humidity (RH2M)', 'Surface Pressure (PS)', 'Dew Point (T2MDEW)', 'Wind Speed (WS50M)', 'Wet Bulb Temp (T2MWET)'],
-            datasets: [{
-                label: 'Feature Importance Weight',
-                data: [0.34, 0.22, 0.18, 0.14, 0.12],
-                backgroundColor: '#38BDF8',
-                borderRadius: 8
-            }]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#CBD5E1' } },
-                y: { grid: { display: false }, ticks: { color: '#FFFFFF', font: { weight: 'bold' } } }
+    if (document.getElementById('importanceChart')) {
+        const ctxBar = document.getElementById('importanceChart').getContext('2d');
+        if (importanceChartInst) importanceChartInst.destroy();
+        importanceChartInst = new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: ['Relative Humidity (RH2M)', 'Surface Pressure (PS)', 'Dew Point (T2MDEW)', 'Wind Speed (WS50M)', 'Wet Bulb Temp (T2MWET)'],
+                datasets: [{
+                    label: 'Feature Importance Weight',
+                    data: [0.34, 0.22, 0.18, 0.14, 0.12],
+                    backgroundColor: '#38BDF8',
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#CBD5E1' } },
+                    y: { grid: { display: false }, ticks: { color: '#FFFFFF', font: { weight: 'bold' } } }
+                }
             }
-        }
-    });
+        });
+    }
 
-    // C. Donut Chart (Model Confidence Consensus)
-    const ctxDonut = document.getElementById('confidenceChart').getContext('2d');
-    if (confidenceChartInst) confidenceChartInst.destroy();
-    confidenceChartInst = new Chart(ctxDonut, {
-        type: 'doughnut',
-        data: {
-            labels: ['Model Confidence', 'Uncertainty Margin'],
-            datasets: [{
-                data: [confidencePct, 100 - confidencePct],
-                backgroundColor: ['#22C55E', 'rgba(255,255,255,0.1)'],
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'bottom', labels: { color: '#FFFFFF' } }
+    // C. Donut Chart (WRI Status Distribution)
+    if (document.getElementById('confidenceChart')) {
+        const ctxDonut = document.getElementById('confidenceChart').getContext('2d');
+        if (confidenceChartInst) confidenceChartInst.destroy();
+        confidenceChartInst = new Chart(ctxDonut, {
+            type: 'doughnut',
+            data: {
+                labels: ['WRI Status', 'Risk Margin'],
+                datasets: [{
+                    data: [confidencePct, 100 - confidencePct],
+                    backgroundColor: ['#22C55E', 'rgba(255,255,255,0.1)'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#FFFFFF' } }
+                }
             }
-        }
-    });
+        });
+    }
 
     // D. Radar Chart (Atmospheric Feature Profile vs Baseline)
     const ctxRadar = document.getElementById('radarChart').getContext('2d');
